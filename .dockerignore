@@ -33,7 +33,7 @@ logs/
 *.temp
 
 # Documentation (already copied separately)
-*.md
+# *.md
 
 # Test files
 test_*
