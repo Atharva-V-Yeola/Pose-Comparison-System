@@ -34,13 +34,15 @@ class VideoPoseAnalyzer:
 
         # Activity Timing variables
         self.activity_events = {}
-        self.current_activity_id = None
 
         # Hit/Miss variables
         self.hit_miss_events = {}
 
         # Distance variables
         self.distance_events = {}
+
+        # Feedback messages
+        self.feedback_messages = []
 
     def calculate_angle(self, point1, point2, point3):
         """Calculate angle between three points"""
@@ -74,7 +76,7 @@ class VideoPoseAnalyzer:
             return 0.0
 
     def _check_activity_start_condition(self, landmarks, frame_number, timestamp, activity_id):
-        """Example: Detect activity start for 'Wall Target Pass' (left elbow flexes) or 'Balance Statue' (single leg balance)"""
+        """Example: Detect activity start when left elbow angle is below 90 degrees"""
         # Example for 'Wall Target Pass': left elbow angle below 90
         left_elbow_angle = self.calculate_angle(landmarks[11], landmarks[13], landmarks[15])
         if activity_id == 'wall_target_pass' and left_elbow_angle < 90:
@@ -90,7 +92,7 @@ class VideoPoseAnalyzer:
         return False
 
     def _check_activity_end_condition(self, landmarks, frame_number, timestamp, activity_id):
-        """Example: Detect activity end for 'Wall Target Pass' (left elbow extends) or 'Balance Statue' (both feet down)"""
+        """Example: Detect activity end when left elbow angle is above 160 degrees"""
         left_elbow_angle = self.calculate_angle(landmarks[11], landmarks[13], landmarks[15])
         if activity_id == 'wall_target_pass' and left_elbow_angle > 160:
             return True
@@ -136,7 +138,8 @@ class VideoPoseAnalyzer:
             'pose_detected': False,
             'activity_status': 'none',
             'hit_status': 'none',
-            'measured_distance': 0.0
+            'measured_distance': 0.0,
+            'feedback_message': ''
         }
         
         if results.pose_landmarks:
@@ -171,6 +174,7 @@ class VideoPoseAnalyzer:
                self._check_activity_start_condition(landmarks, frame_number, timestamp, current_activity_id):
                 self.activity_events[current_activity_id]['start_frame'] = frame_number
                 frame_data['activity_status'] = 'start'
+                frame_data['feedback_message'] = 'Activity started! Keep going.'
             elif self.activity_events[current_activity_id]['start_frame'] is not None and \
                  self.activity_events[current_activity_id]['end_frame'] is None and \
                  self._check_activity_end_condition(landmarks, frame_number, timestamp, current_activity_id):
@@ -179,6 +183,7 @@ class VideoPoseAnalyzer:
                     self.activity_events[current_activity_id]['duration'] = \
                         (self.activity_events[current_activity_id]['end_frame'] - self.activity_events[current_activity_id]['start_frame']) / self.fps
                 frame_data['activity_status'] = 'end'
+                frame_data['feedback_message'] = f'Activity completed in {self.activity_events[current_activity_id]["duration"]:.2f} seconds. Great job!'
             elif self.activity_events[current_activity_id]['start_frame'] is not None and \
                  self.activity_events[current_activity_id]['end_frame'] is None:
                 frame_data['activity_status'] = 'in_progress'
@@ -192,6 +197,7 @@ class VideoPoseAnalyzer:
                self._check_hit_condition(landmarks, frame.shape[1], frame.shape[0], current_hit_event_id):
                 self.hit_miss_events[current_hit_event_id]['hit_detected'] = True
                 frame_data['hit_status'] = 'hit'
+                frame_data['feedback_message'] = 'Target hit! Excellent accuracy.'
             elif self.hit_miss_events[current_hit_event_id]['hit_detected']:
                 frame_data['hit_status'] = 'already_hit'
 
@@ -204,6 +210,12 @@ class VideoPoseAnalyzer:
                 # For actual distance covered, you'd need to track the point over frames
                 # For simplicity, we'll just record the current point's coordinates
 
+            # Generate general feedback based on pose confidence or alignment
+            if frame_data['pose_confidence'] < 70 and frame_data['feedback_message'] == '':
+                frame_data['feedback_message'] = 'Adjust your posture for better detection.'
+            elif frame_data['body_alignment'] < 70 and frame_data['feedback_message'] == '':
+                frame_data['feedback_message'] = 'Try to keep your body more aligned.'
+            
             # Draw pose on frame
             annotated_frame = frame.copy()
             self.mp_drawing.draw_landmarks(
@@ -285,6 +297,7 @@ class VideoPoseAnalyzer:
         self.activity_events = {}
         self.hit_miss_events = {}
         self.distance_events = {}
+        self.feedback_messages = [] # Reset feedback messages for new video
         
         print(f"Processing video: {total_frames} frames at {self.fps} FPS")
         
@@ -297,6 +310,12 @@ class VideoPoseAnalyzer:
             annotated_frame, frame_data = self.analyze_frame(frame, frame_number, timestamp)
             
             self.analysis_data.append(frame_data)
+            if frame_data['feedback_message']:
+                self.feedback_messages.append({
+                    'frame_number': frame_number,
+                    'timestamp': timestamp,
+                    'message': frame_data['feedback_message']
+                })
             
             if output_path:
                 out.write(annotated_frame)
@@ -379,8 +398,11 @@ Activity Timing:
         for hit_event_id, event_data in self.hit_miss_events.items():
             report += f"- Hit Event '{hit_event_id}': {'Detected' if event_data['hit_detected'] else 'Not Detected'}\n"
 
-        report += "\nDistance Measurement (Sample):
-- Shoulder Distance (Avg): {df['shoulder_distance'].mean():.2f} pixels\n\nAngle Analysis:\n"
+        report += "\nDistance Measurement (Sample):\n"
+        # Add more detailed distance reporting here if needed
+        report += f"- Shoulder Distance (Avg): {df['shoulder_distance'].mean():.2f} pixels\n\n"
+
+        report += "Angle Analysis:\n"
         
         angle_stats = self.get_angle_statistics()
         for angle_name, stats in angle_stats.items():
@@ -391,6 +413,13 @@ Activity Timing:
   - Variation (Std Dev): {stats['std']}°
 """
         
+        report += "\nFeedback Messages:\n"
+        if self.feedback_messages:
+            for msg in self.feedback_messages:
+                report += f"- [Frame {msg['frame_number']:.0f}, {msg['timestamp']:.2f}s]: {msg['message']}\n"
+        else:
+            report += "No specific feedback generated.\n"
+
         return report
 
 # Example usage and testing

@@ -9,6 +9,8 @@ document.addEventListener("DOMContentLoaded", function() {
     const activityTimingReport = document.getElementById("activityTimingReport");
     const hitMissReport = document.getElementById("hitMissReport");
     const distanceReport = document.getElementById("distanceReport");
+    const summaryAudioPlayer = document.getElementById("summaryAudioPlayer");
+    const feedbackAudioList = document.getElementById("feedbackAudioList");
 
     let csvDataUrl = null;
 
@@ -31,6 +33,8 @@ document.addEventListener("DOMContentLoaded", function() {
         analyzedVideo.style.display = "none";
         videoStatus.textContent = "";
         downloadCsvButton.style.display = "none";
+        summaryAudioPlayer.style.display = "none";
+        feedbackAudioList.innerHTML = "";
 
         fetch("/api/video/analyze_video", {
             method: "POST",
@@ -98,6 +102,22 @@ document.addEventListener("DOMContentLoaded", function() {
                     csvDataUrl = data.csv_data_url;
                     downloadCsvButton.style.display = "inline-block";
                 }
+
+                // Handle audio feedback
+                if (data.summary_audio && data.summary_audio.audio_url) {
+                    summaryAudioPlayer.src = data.summary_audio.audio_url;
+                    summaryAudioPlayer.style.display = "block";
+                    summaryAudioPlayer.play();
+                }
+
+                if (data.audio_feedback && data.audio_feedback.length > 0) {
+                    let audioHtml = "<h4>Individual Feedback:</h4>";
+                    data.audio_feedback.forEach(audio => {
+                        audioHtml += `<p>${audio.message} (<a href="${audio.audio_url}" target="_blank">Play</a>)</p>`;
+                    });
+                    feedbackAudioList.innerHTML = audioHtml;
+                }
+
             }
         })
         .catch(error => {

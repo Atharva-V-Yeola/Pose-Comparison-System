@@ -1,7 +1,9 @@
 from flask import Blueprint, request, jsonify
 import os
 from src.video_pose_analyzer import VideoPoseAnalyzer
+from src.audio_feedback_generator import AudioFeedbackGenerator
 import pandas as pd
+from default_api import media_generate_speech # Import the tool
 
 video_analysis_bp = Blueprint("video_analysis_bp", __name__)
 
@@ -33,6 +35,44 @@ def analyze_video():
             report = analyzer.generate_analysis_report()
             angle_stats = analyzer.get_angle_statistics()
 
+            # Generate audio feedback
+            audio_generator = AudioFeedbackGenerator(voice_type="male_voice") # Pass selected voice type
+            audio_files = []
+            summary_audio_response = None
+            
+            if analyzer.feedback_messages:
+                # Create audio directory
+                audio_dir = os.path.join(upload_folder, "audio")
+                os.makedirs(audio_dir, exist_ok=True)
+                
+                # Generate individual feedback audio files
+                for i, msg_data in enumerate(analyzer.feedback_messages):
+                    audio_filename = f"feedback_{i+1}_{msg_data["timestamp"]:.2f}s.wav"
+                    audio_path = os.path.join(audio_dir, audio_filename)
+                    
+                    # Call the actual media_generate_speech tool
+                    media_generate_speech(brief="Generating feedback audio", path=audio_path, text=msg_data["message"], voice=audio_generator.voice_type)
+                    
+                    audio_files.append({
+                        "message": msg_data["message"],
+                        "timestamp": msg_data["timestamp"],
+                        "audio_url": f"/uploads/audio/{audio_filename}",
+                        "audio_filename": audio_filename
+                    })
+                
+                # Generate summary audio
+                summary_audio_data = audio_generator.generate_summary_audio(report, audio_dir)
+                summary_audio_path = summary_audio_data["audio_path"]
+                summary_audio_filename = summary_audio_data["audio_filename"]
+                
+                media_generate_speech(brief="Generating summary audio", path=summary_audio_path, text=summary_audio_data["text"], voice=audio_generator.voice_type)
+
+                summary_audio_response = {
+                    "text": summary_audio_data["text"],
+                    "audio_url": f"/uploads/audio/{summary_audio_filename}",
+                    "audio_filename": summary_audio_filename
+                }
+
             # Clean up temporary video files
             os.remove(video_path)
             # os.remove(output_video_path) # Keep analyzed video for now
@@ -45,11 +85,13 @@ def analyze_video():
                 "csv_data_url": f"/uploads/{csv_output_filename}",
                 "activity_events": analyzer.activity_events,
                 "hit_miss_events": analyzer.hit_miss_events,
-                "distance_events": analyzer.distance_events
+                "distance_events": analyzer.distance_events,
+                "feedback_messages": analyzer.feedback_messages,
+                "audio_feedback": audio_files,
+                "summary_audio": summary_audio_response
             })
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
     return jsonify({"error": "Something went wrong"}), 500
-
 
