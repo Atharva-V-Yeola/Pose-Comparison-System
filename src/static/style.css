@@ -1,11 +1,7 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
     color: #333;
@@ -17,261 +13,151 @@ body {
     padding: 20px;
 }
 
-header {
+h1 {
     text-align: center;
-    margin-bottom: 40px;
     color: white;
-}
-
-header h1 {
     font-size: 2.5rem;
     margin-bottom: 10px;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
-header p {
-    font-size: 1.2rem;
-    opacity: 0.9;
-}
-
-.main-content {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 30px;
+.container > p {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.1rem;
     margin-bottom: 30px;
 }
 
-.section {
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.card {
     background: white;
     border-radius: 15px;
     padding: 25px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    transition: transform 0.3s ease;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.section:hover {
+.card:hover {
     transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3);
 }
 
-.section h2 {
+.card.full-width {
+    grid-column: 1 / -1;
+}
+
+.card h2 {
     color: #4a5568;
     margin-bottom: 20px;
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     border-bottom: 2px solid #e2e8f0;
     padding-bottom: 10px;
 }
 
-/* Upload Section */
-.upload-area {
-    text-align: center;
+input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 2px dashed #cbd5e0;
+    border-radius: 8px;
+    background: #f7fafc;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
 }
 
-.btn {
-    padding: 12px 24px;
+input[type="file"]:hover {
+    border-color: #667eea;
+}
+
+button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
     border: none;
+    padding: 12px 24px;
     border-radius: 8px;
+    cursor: pointer;
     font-size: 1rem;
     font-weight: 600;
-    cursor: pointer;
     transition: all 0.3s ease;
     margin: 5px;
 }
 
-.btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-}
-
-.btn-primary:hover {
+button:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
 }
 
-.btn-secondary {
-    background: #718096;
-    color: white;
-}
-
-.btn-secondary:hover {
-    background: #4a5568;
-    transform: translateY(-2px);
-}
-
-.btn-success {
-    background: #48bb78;
-    color: white;
-}
-
-.btn-success:hover {
-    background: #38a169;
-    transform: translateY(-2px);
-}
-
-.btn:disabled {
-    background: #cbd5e0;
-    color: #a0aec0;
+button:disabled {
+    background: #a0aec0;
     cursor: not-allowed;
     transform: none;
+    box-shadow: none;
 }
 
-.status-message {
-    margin-top: 15px;
+video {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 8px;
+    background: #000;
+    margin-bottom: 15px;
+    display: none;
+}
+
+#analysisReport {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px;
+    white-space: pre-wrap;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+}
+
+#uploadStatus, #videoStatus {
+    margin-top: 10px;
     padding: 10px;
     border-radius: 5px;
     font-weight: 500;
 }
 
-.status-success {
-    background: #c6f6d5;
+#uploadStatus {
+    background: #e6fffa;
+    color: #234e52;
+    border: 1px solid #81e6d9;
+}
+
+#videoStatus {
+    background: #f0fff4;
     color: #22543d;
     border: 1px solid #9ae6b4;
 }
 
-.status-error {
-    background: #fed7d7;
-    color: #742a2a;
-    border: 1px solid #fc8181;
-}
-
-.image-preview {
-    margin-top: 15px;
-}
-
-.image-preview img {
-    max-width: 100%;
-    max-height: 200px;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-/* Camera Section */
-.camera-container {
-    text-align: center;
-}
-
-#videoElement {
-    width: 100%;
-    max-width: 400px;
-    height: 300px;
-    border-radius: 10px;
-    background: #f7fafc;
-    border: 2px solid #e2e8f0;
-    object-fit: cover;
-}
-
-.camera-controls {
-    margin-top: 15px;
-}
-
-/* Results Section */
-.results-container {
-    grid-column: 1 / -1;
-}
-
-.results-display {
-    background: #f7fafc;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    text-align: center;
-    font-size: 1.1rem;
-}
-
-.metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-}
-
-.metric {
-    background: #edf2f7;
-    padding: 15px;
-    border-radius: 8px;
-    text-align: center;
-}
-
-.metric-label {
-    display: block;
-    font-weight: 600;
-    color: #4a5568;
-    margin-bottom: 5px;
-}
-
-.metric-value {
-    display: block;
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #2d3748;
-}
-
-/* Export Section */
-.export-container {
-    grid-column: 1 / -1;
-    text-align: center;
-}
-
-.data-display {
-    margin-top: 20px;
-    background: #f7fafc;
-    padding: 20px;
-    border-radius: 8px;
-    text-align: left;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-}
-
-.data-table th,
-.data-table td {
-    padding: 8px 12px;
-    text-align: left;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-.data-table th {
-    background: #edf2f7;
-    font-weight: 600;
-    color: #4a5568;
-}
-
-/* Responsive Design */
 @media (max-width: 768px) {
-    .main-content {
+    .container {
+        padding: 10px;
+    }
+    
+    .card-grid {
         grid-template-columns: 1fr;
-        gap: 20px;
+        gap: 15px;
     }
     
-    header h1 {
-        font-size: 2rem;
-    }
-    
-    .section {
+    .card {
         padding: 20px;
     }
     
-    .metrics {
-        grid-template-columns: 1fr;
+    h1 {
+        font-size: 2rem;
     }
-}
-
-/* Loading Animation */
-.loading {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #667eea;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
 }
 

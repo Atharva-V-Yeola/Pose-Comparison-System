@@ -3,78 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pose Comparison System</title>
+    <title>Pose Analysis System</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Pose Comparison System</h1>
-            <p>Upload a reference pose and compare it with your live camera feed</p>
-        </header>
+        <h1>Pose Analysis System</h1>
+        <p>Upload a video to analyze player posture and angles.</p>
 
-        <div class="main-content">
-            <!-- Reference Image Upload Section -->
-            <div class="section">
-                <h2>1. Upload Reference Pose</h2>
-                <div class="upload-area">
-                    <input type="file" id="referenceInput" accept="image/*" style="display: none;">
-                    <button id="uploadBtn" class="btn btn-primary">Choose Reference Image</button>
-                    <div id="uploadStatus" class="status-message"></div>
-                    <div id="referencePreview" class="image-preview"></div>
-                </div>
+        <div class="card-grid">
+            <div class="card">
+                <h2>1. Upload Video for Analysis</h2>
+                <input type="file" id="videoUpload" accept="video/*">
+                <button id="analyzeVideoButton">Analyze Video</button>
+                <p id="uploadStatus"></p>
             </div>
 
-            <!-- Camera Section -->
-            <div class="section">
-                <h2>2. Live Camera Feed</h2>
-                <div class="camera-container">
-                    <video id="videoElement" autoplay muted playsinline></video>
-                    <canvas id="canvasElement" style="display: none;"></canvas>
-                    <div class="camera-controls">
-                        <button id="startCameraBtn" class="btn btn-primary">Start Camera</button>
-                        <button id="stopCameraBtn" class="btn btn-secondary" disabled>Stop Camera</button>
-                        <button id="captureBtn" class="btn btn-success" disabled>Capture & Compare</button>
-                    </div>
-                </div>
+            <div class="card">
+                <h2>2. Analyzed Video Output</h2>
+                <video id="analyzedVideo" controls autoplay loop muted></video>
+                <p id="videoStatus"></p>
             </div>
 
-            <!-- Results Section -->
-            <div class="section">
-                <h2>3. Comparison Results</h2>
-                <div class="results-container">
-                    <div id="comparisonResults" class="results-display">
-                        <p>Upload a reference image and start the camera to begin comparison</p>
-                    </div>
-                    <div class="metrics">
-                        <div class="metric">
-                            <span class="metric-label">Distance:</span>
-                            <span id="distanceValue" class="metric-value">-</span>
-                        </div>
-                        <div class="metric">
-                            <span class="metric-label">Accuracy:</span>
-                            <span id="accuracyValue" class="metric-value">-</span>
-                        </div>
-                        <div class="metric">
-                            <span class="metric-label">Pose Detected:</span>
-                            <span id="poseDetectedValue" class="metric-value">-</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Data Export Section -->
-            <div class="section">
-                <h2>4. Export Data</h2>
-                <div class="export-container">
-                    <button id="downloadCsvBtn" class="btn btn-secondary">Download CSV Data</button>
-                    <button id="viewDataBtn" class="btn btn-secondary">View Data</button>
-                    <div id="dataDisplay" class="data-display" style="display: none;"></div>
-                </div>
+            <div class="card full-width">
+                <h2>3. Analysis Report</h2>
+                <pre id="analysisReport"></pre>
+                <button id="downloadCsvButton" style="display:none;">Download CSV Data</button>
             </div>
         </div>
     </div>
-
     <script src="script.js"></script>
 </body>
 </html>
