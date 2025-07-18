@@ -30,6 +30,10 @@ class VideoPoseAnalyzer:
         }
         
         self.analysis_data = []
+        self.activity_start_frame = None
+        self.activity_end_frame = None
+        self.activity_duration = 0
+        self.hit_detected = False
         
     def calculate_angle(self, point1, point2, point3):
         """Calculate angle between three points"""
@@ -50,7 +54,53 @@ class VideoPoseAnalyzer:
             return np.degrees(angle)
         except:
             return 0.0
-    
+
+    def calculate_distance(self, point1, point2, frame_width, frame_height):
+        """Calculate Euclidean distance between two points in pixels"""
+        try:
+            x1 = point1.x * frame_width
+            y1 = point1.y * frame_height
+            x2 = point2.x * frame_width
+            y2 = point2.y * frame_height
+            return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        except:
+            return 0.0
+
+    def detect_activity_start(self, landmarks, frame_number):
+        """Example: Detect activity start when left elbow angle is below 90 degrees"""
+        if self.activity_start_frame is None:
+            left_elbow_angle = self.calculate_angle(landmarks[11], landmarks[13], landmarks[15])
+            if left_elbow_angle < 90:
+                self.activity_start_frame = frame_number
+                return True
+        return False
+
+    def detect_activity_end(self, landmarks, frame_number):
+        """Example: Detect activity end when left elbow angle is above 160 degrees"""
+        if self.activity_start_frame is not None and self.activity_end_frame is None:
+            left_elbow_angle = self.calculate_angle(landmarks[11], landmarks[13], landmarks[15])
+            if left_elbow_angle > 160:
+                self.activity_end_frame = frame_number
+                return True
+        return False
+
+    def detect_hit(self, landmarks, frame_width, frame_height):
+        """Example: Detect a 'hit' if right wrist is within a target area (e.g., top right corner) and right elbow is extended"""
+        if not self.hit_detected:
+            right_wrist = landmarks[16]
+            right_elbow_angle = self.calculate_angle(landmarks[14], landmarks[16], landmarks[18]) # Assuming 18 is a point further from wrist
+
+            # Define a target area (e.g., top 20% of width, top 20% of height)
+            target_x_min = 0.8 * frame_width
+            target_y_max = 0.2 * frame_height
+
+            if (right_wrist.x * frame_width > target_x_min and 
+                right_wrist.y * frame_height < target_y_max and 
+                right_elbow_angle > 160): # Extended elbow
+                self.hit_detected = True
+                return True
+        return False
+
     def analyze_frame(self, frame, frame_number, timestamp):
         """Analyze a single frame for pose and angles"""
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -59,7 +109,11 @@ class VideoPoseAnalyzer:
         frame_data = {
             'frame_number': frame_number,
             'timestamp': timestamp,
-            'pose_detected': False
+            'pose_detected': False,
+            'activity_start': False,
+            'activity_end': False,
+            'hit_detected': False,
+            'distance_moved': 0.0 # Placeholder for distance moved
         }
         
         if results.pose_landmarks:
@@ -81,6 +135,20 @@ class VideoPoseAnalyzer:
             # Calculate pose quality metrics
             frame_data['pose_confidence'] = self._calculate_pose_confidence(landmarks)
             frame_data['body_alignment'] = self._calculate_body_alignment(landmarks)
+
+            # Activity Timing
+            if self.detect_activity_start(landmarks, frame_number):
+                frame_data['activity_start'] = True
+            if self.detect_activity_end(landmarks, frame_number):
+                frame_data['activity_end'] = True
+                self.activity_duration = (self.activity_end_frame - self.activity_start_frame) / self.fps if self.fps else 0
+
+            # Distance Measurement (example: distance between left and right shoulder)
+            frame_data['shoulder_distance'] = self.calculate_distance(landmarks[11], landmarks[12], frame.shape[1], frame.shape[0])
+
+            # Hit/Miss Detection
+            if self.detect_hit(landmarks, frame.shape[1], frame.shape[0]):
+                frame_data['hit_detected'] = True
             
             # Draw pose on frame
             annotated_frame = frame.copy()
@@ -148,7 +216,7 @@ class VideoPoseAnalyzer:
         if not cap.isOpened():
             raise ValueError(f"Could not open video file: {video_path}")
         
-        fps = cap.get(cv2.CAP_PROP_FPS)
+        self.fps = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
         # Setup video writer if output path provided
@@ -156,19 +224,23 @@ class VideoPoseAnalyzer:
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            out = cv2.VideoWriter(output_path, fourcc, self.fps, (width, height))
         
         frame_number = 0
         self.analysis_data = []
+        self.activity_start_frame = None
+        self.activity_end_frame = None
+        self.activity_duration = 0
+        self.hit_detected = False
         
-        print(f"Processing video: {total_frames} frames at {fps} FPS")
+        print(f"Processing video: {total_frames} frames at {self.fps} FPS")
         
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
             
-            timestamp = frame_number / fps
+            timestamp = frame_number / self.fps
             annotated_frame, frame_data = self.analyze_frame(frame, frame_number, timestamp)
             
             self.analysis_data.append(frame_data)
@@ -241,6 +313,8 @@ General Statistics:
 - Pose Detection Rate: {detection_rate:.1f}%
 - Average Pose Confidence: {df['pose_confidence'].mean():.1f}%
 - Average Body Alignment: {df['body_alignment'].mean():.1f}%
+- Total Activity Duration: {self.activity_duration:.2f} seconds
+- Hit Detected: {'Yes' if self.hit_detected else 'No'}
 
 Angle Analysis:
 """

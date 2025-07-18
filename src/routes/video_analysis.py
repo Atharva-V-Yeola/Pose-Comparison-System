@@ -42,7 +42,9 @@ def analyze_video():
                 "report": report,
                 "angle_statistics": angle_stats,
                 "analyzed_video_url": f"/uploads/{output_video_filename}",
-                "csv_data_url": f"/uploads/{csv_output_filename}"
+                "csv_data_url": f"/uploads/{csv_output_filename}",
+                "activity_duration": analyzer.activity_duration,
+                "hit_detected": analyzer.hit_detected
             })
         except Exception as e:
             return jsonify({"error": str(e)}), 500
