@@ -30,11 +30,18 @@ class VideoPoseAnalyzer:
         }
         
         self.analysis_data = []
-        self.activity_start_frame = None
-        self.activity_end_frame = None
-        self.activity_duration = 0
-        self.hit_detected = False
-        
+        self.fps = 0
+
+        # Activity Timing variables
+        self.activity_events = {}
+        self.current_activity_id = None
+
+        # Hit/Miss variables
+        self.hit_miss_events = {}
+
+        # Distance variables
+        self.distance_events = {}
+
     def calculate_angle(self, point1, point2, point3):
         """Calculate angle between three points"""
         try:
@@ -66,43 +73,60 @@ class VideoPoseAnalyzer:
         except:
             return 0.0
 
-    def detect_activity_start(self, landmarks, frame_number):
-        """Example: Detect activity start when left elbow angle is below 90 degrees"""
-        if self.activity_start_frame is None:
-            left_elbow_angle = self.calculate_angle(landmarks[11], landmarks[13], landmarks[15])
-            if left_elbow_angle < 90:
-                self.activity_start_frame = frame_number
-                return True
+    def _check_activity_start_condition(self, landmarks, frame_number, timestamp, activity_id):
+        """Example: Detect activity start for 'Wall Target Pass' (left elbow flexes) or 'Balance Statue' (single leg balance)"""
+        # Example for 'Wall Target Pass': left elbow angle below 90
+        left_elbow_angle = self.calculate_angle(landmarks[11], landmarks[13], landmarks[15])
+        if activity_id == 'wall_target_pass' and left_elbow_angle < 90:
+            return True
+        
+        # Example for 'Balance Statue': right hip is significantly higher than left hip (indicating single leg stance)
+        # This is a very basic heuristic and would need refinement
+        right_hip_y = landmarks[24].y
+        left_hip_y = landmarks[23].y
+        if activity_id == 'balance_statue' and (right_hip_y - left_hip_y) > 0.05: # Threshold for hip difference
+            return True
+
         return False
 
-    def detect_activity_end(self, landmarks, frame_number):
-        """Example: Detect activity end when left elbow angle is above 160 degrees"""
-        if self.activity_start_frame is not None and self.activity_end_frame is None:
-            left_elbow_angle = self.calculate_angle(landmarks[11], landmarks[13], landmarks[15])
-            if left_elbow_angle > 160:
-                self.activity_end_frame = frame_number
-                return True
+    def _check_activity_end_condition(self, landmarks, frame_number, timestamp, activity_id):
+        """Example: Detect activity end for 'Wall Target Pass' (left elbow extends) or 'Balance Statue' (both feet down)"""
+        left_elbow_angle = self.calculate_angle(landmarks[11], landmarks[13], landmarks[15])
+        if activity_id == 'wall_target_pass' and left_elbow_angle > 160:
+            return True
+
+        # Example for 'Balance Statue': both hips are level again
+        right_hip_y = landmarks[24].y
+        left_hip_y = landmarks[23].y
+        if activity_id == 'balance_statue' and abs(right_hip_y - left_hip_y) < 0.02: # Threshold for hip difference
+            return True
+
         return False
 
-    def detect_hit(self, landmarks, frame_width, frame_height):
-        """Example: Detect a 'hit' if right wrist is within a target area (e.g., top right corner) and right elbow is extended"""
-        if not self.hit_detected:
+    def _check_hit_condition(self, landmarks, frame_width, frame_height, hit_event_id):
+        """Example: Detect a 'hit' for 'Wall Target Pass' (right wrist in target area)"""
+        if hit_event_id == 'wall_target_hit':
             right_wrist = landmarks[16]
-            right_elbow_angle = self.calculate_angle(landmarks[14], landmarks[16], landmarks[18]) # Assuming 18 is a point further from wrist
-
-            # Define a target area (e.g., top 20% of width, top 20% of height)
-            target_x_min = 0.8 * frame_width
-            target_y_max = 0.2 * frame_height
+            # Define a target area (e.g., top-right quadrant for a wall target)
+            target_x_min = 0.7 * frame_width
+            target_y_max = 0.3 * frame_height
 
             if (right_wrist.x * frame_width > target_x_min and 
-                right_wrist.y * frame_height < target_y_max and 
-                right_elbow_angle > 160): # Extended elbow
-                self.hit_detected = True
+                right_wrist.y * frame_height < target_y_max):
                 return True
         return False
 
+    def _measure_specific_distance(self, landmarks, frame_width, frame_height, distance_event_id):
+        """Example: Measure distance for 'Walk & Tap Relay' (distance covered by hip)"""
+        if distance_event_id == 'walk_tap_relay_distance':
+            # Track a key point, e.g., mid-hip (average of left and right hip)
+            mid_hip_x = (landmarks[23].x + landmarks[24].x) / 2 * frame_width
+            mid_hip_y = (landmarks[23].y + landmarks[24].y) / 2 * frame_height
+            return (mid_hip_x, mid_hip_y)
+        return None
+
     def analyze_frame(self, frame, frame_number, timestamp):
-        """Analyze a single frame for pose and angles"""
+        """Analyze a single frame for pose and angles, and custom metrics"""
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.pose.process(rgb_frame)
         
@@ -110,10 +134,9 @@ class VideoPoseAnalyzer:
             'frame_number': frame_number,
             'timestamp': timestamp,
             'pose_detected': False,
-            'activity_start': False,
-            'activity_end': False,
-            'hit_detected': False,
-            'distance_moved': 0.0 # Placeholder for distance moved
+            'activity_status': 'none',
+            'hit_status': 'none',
+            'measured_distance': 0.0
         }
         
         if results.pose_landmarks:
@@ -136,20 +159,51 @@ class VideoPoseAnalyzer:
             frame_data['pose_confidence'] = self._calculate_pose_confidence(landmarks)
             frame_data['body_alignment'] = self._calculate_body_alignment(landmarks)
 
-            # Activity Timing
-            if self.detect_activity_start(landmarks, frame_number):
-                frame_data['activity_start'] = True
-            if self.detect_activity_end(landmarks, frame_number):
-                frame_data['activity_end'] = True
-                self.activity_duration = (self.activity_end_frame - self.activity_start_frame) / self.fps if self.fps else 0
+            # --- Activity Timing --- 
+            # This part needs to be configured based on the specific exercise being analyzed
+            # For demonstration, let's assume we are looking for 'wall_target_pass' activity
+            current_activity_id = 'wall_target_pass' # Or 'balance_statue', etc. - this would come from user input
 
-            # Distance Measurement (example: distance between left and right shoulder)
-            frame_data['shoulder_distance'] = self.calculate_distance(landmarks[11], landmarks[12], frame.shape[1], frame.shape[0])
+            if current_activity_id not in self.activity_events:
+                self.activity_events[current_activity_id] = {'start_frame': None, 'end_frame': None, 'duration': 0}
 
-            # Hit/Miss Detection
-            if self.detect_hit(landmarks, frame.shape[1], frame.shape[0]):
-                frame_data['hit_detected'] = True
-            
+            if self.activity_events[current_activity_id]['start_frame'] is None and \
+               self._check_activity_start_condition(landmarks, frame_number, timestamp, current_activity_id):
+                self.activity_events[current_activity_id]['start_frame'] = frame_number
+                frame_data['activity_status'] = 'start'
+            elif self.activity_events[current_activity_id]['start_frame'] is not None and \
+                 self.activity_events[current_activity_id]['end_frame'] is None and \
+                 self._check_activity_end_condition(landmarks, frame_number, timestamp, current_activity_id):
+                self.activity_events[current_activity_id]['end_frame'] = frame_number
+                if self.fps > 0:
+                    self.activity_events[current_activity_id]['duration'] = \
+                        (self.activity_events[current_activity_id]['end_frame'] - self.activity_events[current_activity_id]['start_frame']) / self.fps
+                frame_data['activity_status'] = 'end'
+            elif self.activity_events[current_activity_id]['start_frame'] is not None and \
+                 self.activity_events[current_activity_id]['end_frame'] is None:
+                frame_data['activity_status'] = 'in_progress'
+
+            # --- Hit/Miss Detection ---
+            current_hit_event_id = 'wall_target_hit' # This would also come from user input
+            if current_hit_event_id not in self.hit_miss_events:
+                self.hit_miss_events[current_hit_event_id] = {'hit_detected': False}
+
+            if not self.hit_miss_events[current_hit_event_id]['hit_detected'] and \
+               self._check_hit_condition(landmarks, frame.shape[1], frame.shape[0], current_hit_event_id):
+                self.hit_miss_events[current_hit_event_id]['hit_detected'] = True
+                frame_data['hit_status'] = 'hit'
+            elif self.hit_miss_events[current_hit_event_id]['hit_detected']:
+                frame_data['hit_status'] = 'already_hit'
+
+            # --- Distance Measurement --- 
+            current_distance_event_id = 'walk_tap_relay_distance' # This would also come from user input
+            measured_point = self._measure_specific_distance(landmarks, frame.shape[1], frame.shape[0], current_distance_event_id)
+            if measured_point:
+                frame_data['measured_distance_x'] = measured_point[0]
+                frame_data['measured_distance_y'] = measured_point[1]
+                # For actual distance covered, you'd need to track the point over frames
+                # For simplicity, we'll just record the current point's coordinates
+
             # Draw pose on frame
             annotated_frame = frame.copy()
             self.mp_drawing.draw_landmarks(
@@ -228,10 +282,9 @@ class VideoPoseAnalyzer:
         
         frame_number = 0
         self.analysis_data = []
-        self.activity_start_frame = None
-        self.activity_end_frame = None
-        self.activity_duration = 0
-        self.hit_detected = False
+        self.activity_events = {}
+        self.hit_miss_events = {}
+        self.distance_events = {}
         
         print(f"Processing video: {total_frames} frames at {self.fps} FPS")
         
@@ -313,11 +366,21 @@ General Statistics:
 - Pose Detection Rate: {detection_rate:.1f}%
 - Average Pose Confidence: {df['pose_confidence'].mean():.1f}%
 - Average Body Alignment: {df['body_alignment'].mean():.1f}%
-- Total Activity Duration: {self.activity_duration:.2f} seconds
-- Hit Detected: {'Yes' if self.hit_detected else 'No'}
 
-Angle Analysis:
+Activity Timing:
 """
+        for activity_id, event_data in self.activity_events.items():
+            if event_data['start_frame'] is not None and event_data['end_frame'] is not None:
+                report += f"- Activity '{activity_id}' Duration: {event_data['duration']:.2f} seconds\n"
+            else:
+                report += f"- Activity '{activity_id}' not completed or detected.\n"
+
+        report += "\nHit/Miss Detection:\n"
+        for hit_event_id, event_data in self.hit_miss_events.items():
+            report += f"- Hit Event '{hit_event_id}': {'Detected' if event_data['hit_detected'] else 'Not Detected'}\n"
+
+        report += "\nDistance Measurement (Sample):
+- Shoulder Distance (Avg): {df['shoulder_distance'].mean():.2f} pixels\n\nAngle Analysis:\n"
         
         angle_stats = self.get_angle_statistics()
         for angle_name, stats in angle_stats.items():
@@ -344,4 +407,5 @@ if __name__ == "__main__":
     # print(analyzer.generate_analysis_report())
     
     print("VideoPoseAnalyzer class created successfully!")
+
 

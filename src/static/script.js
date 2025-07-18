@@ -6,8 +6,9 @@ document.addEventListener("DOMContentLoaded", function() {
     const videoStatus = document.getElementById("videoStatus");
     const analysisReport = document.getElementById("analysisReport");
     const downloadCsvButton = document.getElementById("downloadCsvButton");
-    const activityDurationSpan = document.getElementById("activityDuration");
-    const hitDetectedSpan = document.getElementById("hitDetected");
+    const activityTimingReport = document.getElementById("activityTimingReport");
+    const hitMissReport = document.getElementById("hitMissReport");
+    const distanceReport = document.getElementById("distanceReport");
 
     let csvDataUrl = null;
 
@@ -24,8 +25,9 @@ document.addEventListener("DOMContentLoaded", function() {
         uploadStatus.textContent = "Uploading and analyzing video...";
         analyzeVideoButton.disabled = true;
         analysisReport.textContent = "";
-        activityDurationSpan.textContent = "-";
-        hitDetectedSpan.textContent = "-";
+        activityTimingReport.innerHTML = "";
+        hitMissReport.innerHTML = "";
+        distanceReport.innerHTML = "";
         analyzedVideo.style.display = "none";
         videoStatus.textContent = "";
         downloadCsvButton.style.display = "none";
@@ -53,12 +55,42 @@ document.addEventListener("DOMContentLoaded", function() {
                     analysisReport.textContent = data.report;
                 }
 
-                // Display new metrics
-                if (data.activity_duration !== undefined) {
-                    activityDurationSpan.textContent = data.activity_duration.toFixed(2);
+                // Display activity timing
+                if (data.activity_events) {
+                    let html = "";
+                    for (const activityId in data.activity_events) {
+                        const event = data.activity_events[activityId];
+                        if (event.start_frame !== null && event.end_frame !== null) {
+                            html += `<p><strong>${activityId.replace(/_/g, ' ').toUpperCase()}:</strong> ${event.duration.toFixed(2)} seconds</p>`;
+                        } else {
+                            html += `<p><strong>${activityId.replace(/_/g, ' ').toUpperCase()}:</strong> Not completed or detected.</p>`;
+                        }
+                    }
+                    activityTimingReport.innerHTML = html;
                 }
-                if (data.hit_detected !== undefined) {
-                    hitDetectedSpan.textContent = data.hit_detected ? "Yes" : "No";
+
+                // Display hit/miss
+                if (data.hit_miss_events) {
+                    let html = "";
+                    for (const hitEventId in data.hit_miss_events) {
+                        const event = data.hit_miss_events[hitEventId];
+                        html += `<p><strong>${hitEventId.replace(/_/g, ' ').toUpperCase()}:</strong> ${event.hit_detected ? 'Detected' : 'Not Detected'}</p>`;
+                    }
+                    hitMissReport.innerHTML = html;
+                }
+
+                // Display distance measurement
+                if (data.distance_events) {
+                    let html = "";
+                    for (const distanceEventId in data.distance_events) {
+                        const event = data.distance_events[distanceEventId];
+                        if (event.start_point && event.end_point) {
+                            html += `<p><strong>${distanceEventId.replace(/_/g, ' ').toUpperCase()}:</strong> ${event.distance.toFixed(2)} pixels</p>`;
+                        } else if (event.current_point) {
+                            html += `<p><strong>${distanceEventId.replace(/_/g, ' ').toUpperCase()}:</strong> Current X: ${event.current_point[0].toFixed(2)}, Y: ${event.current_point[1].toFixed(2)}</p>`;
+                        }
+                    }
+                    distanceReport.innerHTML = html;
                 }
 
                 // Setup CSV download
